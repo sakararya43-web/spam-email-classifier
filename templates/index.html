@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Email Spam Classifier</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      overflow: hidden;
+      color: white;
+      font-family: Inter, Arial, sans-serif;
+      background:
+        radial-gradient(circle at 50% 48%, #b78cff 0, transparent 10%),
+        linear-gradient(135deg, #05020b, #170725 50%, #05020b);
+    }
+
+    canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: .9;
+    }
+
+    .content {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      padding: 24px;
+    }
+
+    .card {
+      width: min(650px, 100%);
+      padding: 42px 32px;
+      border: 1px solid rgba(255,255,255,.18);
+      border-radius: 24px;
+      background: rgba(12, 4, 25, .48);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 0 70px rgba(176, 102, 255, .2);
+    }
+
+    h1 {
+      margin: 0 0 14px;
+      font-size: clamp(2.3rem, 7vw, 4.8rem);
+      letter-spacing: -3px;
+      background: linear-gradient(90deg, #fff, #ca9cff);
+      -webkit-background-clip: text;
+      color: transparent;
+    }
+
+    p {
+      color: #d7c9e8;
+      font-size: 1.05rem;
+      margin-bottom: 30px;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 130px;
+      resize: vertical;
+      padding: 16px;
+      color: white;
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.2);
+      border-radius: 14px;
+      outline: none;
+      font: inherit;
+    }
+
+    textarea:focus {
+      border-color: #bd83ff;
+      box-shadow: 0 0 20px rgba(189,131,255,.25);
+    }
+
+    button {
+      margin-top: 18px;
+      padding: 14px 30px;
+      border: 0;
+      border-radius: 999px;
+      color: #160622;
+      background: linear-gradient(90deg, #fff, #bd83ff);
+      font-weight: 700;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: transform .2s, box-shadow .2s;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0 25px rgba(205,145,255,.7);
+    }
+
+    #result {
+      min-height: 24px;
+      margin-top: 20px;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="waves"></canvas>
+
+  <main class="content">
+    <section class="card">
+      <h1>Email Spam Classifier</h1>
+      <p>Detect whether an email is legitimate or spam.</p>
+
+      <textarea id="emailText" placeholder="Paste an email message here..."></textarea>
+      <br />
+      <button onclick="classifyEmail()">Classify Email</button>
+
+      <div id="result"></div>
+    </section>
+  </main>
+
+  <script>
+    const canvas = document.getElementById("waves");
+    const ctx = canvas.getContext("2d");
+    let width, height, time = 0;
+
+    function resize() {
+      width = canvas.width = window.innerWidth * devicePixelRatio;
+      height = canvas.height = window.innerHeight * devicePixelRatio;
+      ctx.scale(devicePixelRatio, devicePixelRatio);
+      width = window.innerWidth;
+      height = window.innerHeight;
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, width, height);
+
+      for (let wave = 0; wave < 9; wave++) {
+        ctx.beginPath();
+
+        for (let x = -20; x <= width + 20; x += 5) {
+          const y =
+            height * .5 +
+            Math.sin(x * .008 + time + wave) * (35 + wave * 8) +
+            Math.sin(x * .003 - time * .7) * 40;
+
+          if (x === -20) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+
+        ctx.strokeStyle = `rgba(190, 125, 255, ${.25 + wave * .05})`;
+        ctx.lineWidth = wave === 4 ? 2 : 1;
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = "#b979ff";
+        ctx.stroke();
+      }
+
+      time += .012;
+      requestAnimationFrame(draw);
+    }
+
+    async function classifyEmail() {
+      const result = document.getElementById("result");
+      const text = document.getElementById("emailText").value.trim();
+
+      if (!text) {
+        result.textContent = "Please enter an email message.";
+        result.style.color = "#ffb4c4";
+        return;
+      }
+
+      result.textContent = "Classifying...";
+      result.style.color = "#d2a5ff";
+
+      try {
+        const response = await fetch('/predict', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ text: text })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          if (data.label === 'spam') {
+            result.textContent = "The email is spam";
+            result.style.color = "#ff6b6b";
+          } else {
+            result.textContent = "The email is legit";
+            result.style.color = "#69db7c";
+          }
+        } else {
+          result.textContent = `Error: ${data.error || 'Failed to classify'}`;
+          result.style.color = "#ffb4c4";
+        }
+      } catch (error) {
+        result.textContent = "An error occurred connecting to the server.";
+        result.style.color = "#ffb4c4";
+      }
+    }
+
+    window.addEventListener("resize", resize);
+    resize();
+    draw();
+  </script>
+</body>
+</html>
